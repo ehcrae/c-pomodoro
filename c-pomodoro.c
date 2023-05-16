@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
-#include "termcolor-c.h"
+#include "included/termcolor-c.h"
 
-#define MAX_CMD_LEN 10
+#define MAX_CMD_LEN 3
 #define DEFAULT_MINS 25
 
 int to_12hr(int hour) {
@@ -60,47 +60,77 @@ void pd_success() {
     printf("\t\t\t");
     text_bold(stdout);
     text_green(stdout);
-    printf("Success!");
+    printf("success!");
     reset_colors(stdout);
 
-    printf("\n");
-    
+    printf("\n\n\n");
 }
 
-int main(int argc, char *argv[]) {
-    char *command = argv[1];
-    time_t rawtime;
-    struct tm *info;
-    time(&rawtime);
-    info = localtime(&rawtime);
+void command_prompt(char length_str[MAX_CMD_LEN], char rest_length_str[MAX_CMD_LEN], int *length, int *rest_length) {
+    printf("pomodoro length (1-60): ");
+    fgets(length_str, MAX_CMD_LEN, stdin);
+    printf("rest length (1-60): ");
+    fgets(rest_length_str, MAX_CMD_LEN, stdin);
 
+    *length = atoi(length_str);
+    *rest_length = atoi(rest_length_str);
+}
 
-    int hour = info->tm_hour;
-    hour = to_12hr(hour);
-    int min = info->tm_min;
-    int sec = info->tm_sec;
-
-    int mins = DEFAULT_MINS;
+void pomodoro_display(int *hour,int *min,int *sec,int length) {
     int i = 0;
-    if (command) {
-        mins = atoi(command);
-    }
-
-    int length = mins * 60;
-
-    printf("\e[1;1H\e[2J"); // works on ANSI terminals, demands POSIX
-    printf("\n\n\n");
-
-    success_time(hour, min, sec, mins);
-
-    while (i < length) {
-        update_time(&hour, &min, &sec);
+    while (i < length * 60) {
+        update_time(hour, min, sec);
         sleep(1);
         refresh_line();
         i++;
     }
+}
+int continue_prompt() {
+    text_underline(stdout);
+    printf("begin rest timer?");
+    reset_colors(stdout);
+    printf(" (y/n): ");
+    char input;
+    fgets(&input, 2, stdin);
 
+    if (input == 'y') {
+        return 1;
+    } else if (input == 'n') {
+        return 0;
+    } else {
+        continue_prompt();
+    }
+}
+
+int main(void) {
+    char length_str[MAX_CMD_LEN];
+    char rest_length_str[MAX_CMD_LEN];
+    int length = 0;
+    int rest_length = 0;
+    printf("\e[1;1H\e[2J"); // works on ANSI terminals, demands POSIX
+    command_prompt(length_str, rest_length_str, &length, &rest_length);
+
+    printf("\e[1;1H\e[2J"); // works on ANSI terminals, demands POSIX
+    printf("\n\n\n");
+
+    // get time values
+    time_t rawtime;
+    struct tm *info;
+    time(&rawtime);
+    info = localtime(&rawtime);
+    int hour = to_12hr(info->tm_hour);
+    int min = info->tm_min;
+    int sec = info->tm_sec;
+    // pomodoro times
+    success_time(hour, min, sec, length);
+    pomodoro_display(&hour, &min, &sec, length);
     pd_success();
-
+    if (continue_prompt()) {
+        update_time(&hour, &min, &sec);
+        printf("\e[1;1H\e[2J"); // works on ANSI terminals, demands POSIX
+        printf("\n\n\n");
+        success_time(hour, min, sec, rest_length);
+        pomodoro_display(&hour, &min, &sec, rest_length);
+    }
     return 0;
 }
